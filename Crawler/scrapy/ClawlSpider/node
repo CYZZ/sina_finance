@@ -1,0 +1,45 @@
+- ClawlSpider: Spider的一个子类
+    - 全战数据爬取的方式
+        - 基于Spider：手动请求
+        - 基于ClawlSpider
+    - CrawlSpider的使用：
+        - 创建一个工程
+        - cd xxx
+        - 创建爬虫文件（ClawlSpider):
+            - scrapy genspider -t crawl xxx www.xxx.com
+            - 链接提取器
+                - 作用：根据制定的规则（allow）提取页面那种的符合链接
+
+- 分布式爬虫
+    - 概念：我们需要搭建一个分布式的机群，让其对一组资源进行分布联合爬取。
+    - 作用：提升爬取数据的效率
+
+    - 如何实现分布式？
+        - 安装一个scrapy-redis的组件
+        - 原生的scrapy是不可以实现分布式爬虫，必须要让scrapy结合着scrapy-redis组件一起实现分布式爬虫
+        - 为什么原生的scrapy不可以实现分布式？
+            - 调度器不可以被分布式机群共享
+            - 管道不可以被分布式机群共享
+        - scrapy-redis组件作用：
+            - 可以给原生的scrapy框架挺可以被共享的管道和调度器
+        - 实现流程
+            - 创建一个工程
+            - 创建一个基于CrawSpider的爬虫文件
+
+- 增量式爬虫
+    - 概念：监测网站数据更新的情况，只会爬取网站最新更新出来的数据。
+    - 如果想对网站长期跟踪，抓取最新更新出来的数据，不重复爬取之前的数据。
+    - 分析：
+        - 指定一个起始url
+        - 基于CrawlSpider获取其他页码链接
+        - 从每一个页码对应的页面源码中解析出每一个电影详情页的Url
+        - 核心：检测电影详情页的url之前有没有请求过
+            - 将爬取过的电影详情页的url存储
+                - 存储到redis的set数据结构
+                
+        - 详情页的url发起请求，然后解析出电影的名称和简介
+        - 进行持久化存储
+
+
+量化交易到底行不行？
+; http://quotes.money.163.com/service/chddata.html?code=0600519&start=20010827&end=20220304&fields=TCLOSE;HIGH;LOW;TOPEN;LCLOSE;CHG;PCHG;TURNOVER;VOTURNOVER;VATURNOVER;TCAP;MCAP

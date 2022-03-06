@@ -27,6 +27,7 @@ def auth_jukuang():
     f = open('account.json')
     # read JSON object
     data = json.load(f)
+    f.close()
     auth(data['account'], data['password'])
 
 
