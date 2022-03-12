@@ -10,14 +10,16 @@ def get_data(code="000001"):
     # url = "http://62.push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery33103422893090882453_1641114428433&secid=1.000001&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61&klt=101&fqt=1&end=20500101&lmt=120&_=1641114428436"
     url = "http://62.push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery33103422893090882453_1641114428433&secid=1." + code + "&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61&klt=101&fqt=1&end=20500101&lmt=120&_=1641114428436"
     data = request_data(url)
-    splits, name = convert_data_to_json(data, pre="jQuery33103422893090882453_1641114428433\(")
+    splits, name, _ = convert_data_to_json(data, pre="jQuery33103422893090882453_1641114428433\(")
     print("name====",name)
     return splits, name
 
 
 def convert_data_to_json(data: str, pre=""):
     print("start convert data----====")
-    find_json = re.compile(r'jQuery33103422893090882453_1641114428433\((.*?)\)')
+    regular = r'%s(.*?)\)'%pre
+    # find_json = re.compile(r'jQuery33103422893090882453_1641114428433\((.*?)\)')
+    find_json = re.compile(regular)
     json_str = re.findall(find_json, data)[0]
     dic = json.loads(json_str)
     klines = dic["data"]["klines"]
@@ -34,7 +36,7 @@ def convert_data_to_json(data: str, pre=""):
     # print(splits)
     name = dic["data"]["name"]
     print("====-=-=-=89898989")
-    return splits, name
+    return splits, name, klines
 
 
 def request_data(url: str):

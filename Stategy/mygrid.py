@@ -1,7 +1,13 @@
 # 我的策略，该模块用于测试每个策略的收益率
 import matplotlib.pyplot as plt
 
-from eastmoney.kline.kline_test import get_data
+import sys
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
+# from eastmoney.kline.kline_test import get_data
 from matplotlib.dates import date2num
 import pandas as pd
 from pandas import DataFrame, Series, DatetimeIndex
@@ -54,3 +60,9 @@ def grid_etf():
     print(tack_series)
 
 grid_etf()
+
+def RotationStrategy():
+    '''
+    轮动策略
+    '''
+    pass

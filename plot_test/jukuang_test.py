@@ -81,9 +81,9 @@ def test_fundamentals():
 
 
 # test_fundamentals()
-auth_jukuang()
-# jq.get_query_count
-print(get_query_count())
+# auth_jukuang()
+# # jq.get_query_count
+# print(get_query_count())
 # 交易市场	代码后缀	示例代码	证券简称
 # 上海证券交易所	.XSHG	600519.XSHG	贵州茅台
 # 深圳证券交易所	.XSHE	000001.XSHE	平安银行
