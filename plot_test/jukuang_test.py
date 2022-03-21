@@ -24,11 +24,12 @@ def auth_jukuang():
     登录聚宽平台,通过读取json文件，获取账号和密码
     """
     # Opening JSON file
-    f = open('account.json')
+    f = open('plot_test/account.json')
     # read JSON object
     data = json.load(f)
     f.close()
     auth(data['account'], data['password'])
+    print(jq.get_query_count())
 
 
 def load_data_from_jukuang_service():
