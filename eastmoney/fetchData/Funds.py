@@ -9,6 +9,9 @@ from pandas import *
 import pandas as pd
 import numpy as np
 import jqdatasdk as jq
+from datetime import date
+import matplotlib.pyplot as plt
+import math
 
 import sys
 from pathlib import Path
@@ -94,9 +97,13 @@ class EastFunds():
 
     @classmethod
     def read_funds_from(self, file: str) -> DataFrame:
+        '''
+        从本地文件读取基金持仓数据，
+        return:以时间为索引，例：2013-12-01
+        '''
         df = pd.read_csv(file, dtype={'股票代码': str})
         df.占净值比例 = df.apply(lambda x: float(x.占净值比例[0:-1]) / 100.0, axis=1)
-        df.set_index(['date'], inplace=True)
+        df.set_index(['date'], inplace=True)  # 设置时间为索引
         return df
 
     @classmethod
@@ -105,11 +112,10 @@ class EastFunds():
         从聚宽平台获取数据
         :return:
         """
-        auth_jukuang()
-        print("codes=",codes)
+        # auth_jukuang()
+        print("codes=", codes)
         # 转换代码格式
         nm_code = jq.normalize_code(codes)
-        print("获取格式代码=",nm_code)
 
         # 输入
         # jq.normalize_code(['000001', 'SZ000001', '000001SZ', '000001.sz', '000001.XSHE'])
@@ -121,36 +127,99 @@ class EastFunds():
         # 获取当前的行情数据
         df_stock: DataFrame = jq.get_price(nm_code, count=count, end_date=end_date, fields=fields, panel=False)
         print("----开始查看持仓股票的信息----")
+        df_stock.set_index(['code'], inplace=True)
         print(df_stock)
+        return nm_code, df_stock
+    
+    @classmethod
+    def calculate_fund_earnings_rate(self, fileName: str):
+        """
+        计算拟合收益率,
+        return:每个季度的持仓收益率
+        """
+        #先从文件中读取对应的基金持仓数据
+        df = self.read_funds_from(fileName)
+        end_date = df.index.tolist()
+        # 获取时间序列
+        end_date = list(set(end_date))  # 不能保证原有的顺序
+        end_date.sort()
+        print(end_date)
 
-# content, arryear, curyear = eastFunds.request_funds(code="512880")
-# print(content)
-# print(arryear)
+        # test 获取股票代码
+        first_end_date = end_date[0]
+        first_quarterly = df.loc[first_end_date]
+        print(first_quarterly)
+        codes = first_quarterly.loc[:, '股票代码'].tolist()
 
+        date_len = len(end_date)
+        result_rate = []
+        for index, obj in enumerate(end_date):
+            print("index=", index)
+            print("obj=", obj)
 
-# df = pd.read_csv("159928_基金历史十大持仓.csv", dtype={'股票代码':str})
-# df.占净值比例 = df.apply(lambda x: float(x.占净值比例[0:-1])/100.0, axis=1)
-# df.set_index(['date', '序号'],inplace=True)
-df = EastFunds.read_funds_from('159928_基金历史十大持仓.csv')
-print(df.head())
-# end_date = '2013-12-31'
-# end_date = df.loc[:,'date']
-end_date = df.index.tolist()
-end_date = list(set(end_date)) # 不能保证原有的顺序
-end_date.sort()
-# new_numbers = []
-# for x in end_date:
-#     if x not in new_numbers:
-#        new_numbers.append(x)
-# new_numbers = end_date.map(lambda x: x)
+            quarterly = df.loc[obj]
+            codes = quarterly.loc[:, '股票代码'].tolist()
+            rates = quarterly['占净值比例'].values.round(4).tolist()
+            
+            if index + 1 < date_len:
+                result = self.calculate_one_season_rate(codes=codes,rates=rates,start_date=obj,end_date=end_date[index + 1])
+                result_rate.append(result)
+            else:
+                current_date = date.today().strftime('%Y-%m-%d')
+                result = self.calculate_one_season_rate(codes=codes,rates=rates,start_date=obj,end_date=current_date)
+                result_rate.append(result)
+        print(result_rate)
+        return result_rate
 
+    
+    @classmethod
+    def calculate_one_season_rate(self, codes, rates, start_date, end_date):
+        """
+        计算时间段内的收益率
+        codes:股票的代码列表
+        rates:持仓占比
+        start_date:开始的日期
+        end_date:结束的日期
+        """
+        # test 只取前五个
+        # codes = codes[:5]
+        # rates = rates[:5]
+        
+        nm_codes, start_stock = self.load_data_from_jukuang_service(codes=codes, end_date=start_date)
+        start_closes_price = list(map(lambda x: start_stock.loc[x,'close'], nm_codes))
 
-first_quarterly = df.loc[end_date[0]]
-print(first_quarterly)
-codes = first_quarterly.loc[:, '股票代码'].tolist()
+        _, end_stock = self.load_data_from_jukuang_service(codes=codes, end_date=end_date)
+        # 根据股票代码获取对应的收盘数据
+        end_closes_price = list(map(lambda x: end_stock.loc[x,'close'], nm_codes))
+        sum_rate = sum(rates)
+        print("sum_rate=",sum_rate)
+        real_rate = list(map(lambda x:x/sum_rate,rates))
+        print("real_rate=",real_rate)
+        #  计算涨跌幅并乘上持仓占比，如果为nan直接当做这个股票是不涨不跌，前后为1
+        result = list(map(lambda x, y, z: (x/y*z).round(5) if not math.isnan(x/y*z) else z, end_closes_price, start_closes_price, real_rate))
+        
+        print("myresult===--",result)
 
+        return sum(result)
 
+# 通过读取csv文件获取持仓数据并
+# 通过聚宽平台获取每个股票的收盘价
+# auth_jukuang()
+# result = EastFunds.calculate_fund_earnings_rate("512660_基金历史十大持仓.csv")
 
-df_stock = EastFunds.load_data_from_jukuang_service(codes=codes, end_date=end_date)
-print(df_stock)
+# abc = [1.0286699999999998, 1.0474124038713053, 0.8196399999999999, 1.05106, 0.93913, 0.9871900000000001, 0.80694, 1.07463, 0.8642500000000001, 1.2940500000000001, 0.91686, 1.02565, 0.98722, 0.9142600000000001, 1.0839299999999998, 1.2366000000000001, 1.2593999999999999, 0.78491, 1.1071000000000002, 1.02057, 1.15743, 0.80929]
 
+# sum = 1
+# result_arr = [1]
+# for obj in abc:
+#     sum *= obj
+#     # print(sum)
+#     result_arr.append(sum)
+# # print(sum)
+# print(result_arr)
+# x = ['2016-09-30', '2016-12-31', '2017-03-31', '2017-06-30', '2017-09-30', '2017-12-31', '2018-03-31', '2018-06-30', '2018-09-30', '2018-12-31', '2019-03-31', '2019-06-30', '2019-09-30', '2019-12-31', '2020-03-31', '2020-06-30', '2020-09-30', '2020-12-31', '2021-03-31', '2021-06-30', '2021-09-30', '2021-12-31', '2022-03-26']
+# plt.plot(x,result_arr)
+# plt.show()
+
+# 通过东财的网站抓取数据并存入到csv文件中
+# EastFunds.request_fund_all_data("510300")
