@@ -19,12 +19,13 @@ from  eastmoney.kline import kline_test
 class eastStock():
 
     @classmethod
-    def request_shangzheng_shenzheng(self, code: str, ctype=1,klt="101"):
+    def request_shangzheng_shenzheng(self, code: str, ctype=1,klt="101",fqt="0"):
         """
         请求A股的股票数据,默认请求所有的历史日K数据，
         param:code:股票代码
         ctype:股票类型，1表示上证，0表示深证
-        klt:是k线类型，默认是日K，101是周K
+        klt:是k线类型，默认是日K，101是周K,
+        fqt:0不复权，1前复权，2后复权
         """
         url = "http://22.push2his.eastmoney.com/api/qt/stock/kline/get"
         cb = ""
@@ -35,7 +36,7 @@ class eastStock():
             "fields1": "f1,f2,f3,f4,f5,f6",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
             "klt": klt,
-            "fqt": "0",
+            "fqt": fqt,
             "end": "20500101",
             "lmt": "1000000",
             "_": "1646568864248"
@@ -62,16 +63,16 @@ class eastStock():
         df.to_csv(name)
         # print(df.head())
 
-code = "300059"
-# code = "600519"
-name,klines = eastStock.request_shangzheng_shenzheng(code,ctype=0)
+# code = "300059"
+code = "601012"
+name, klines = eastStock.request_shangzheng_shenzheng(code, ctype=1, klt="103", fqt="2")
 
 # name,_, klines = eastStock.get_shenzheng(code)
-eastStock.save_data(name=code + "_" + name + ".csv",klines=klines)
+eastStock.save_data(name=code + "_" + name + "后复权月K" + ".csv",klines=klines)
 # name, klines = eastStock.request_shenzheng(code=code)
 print(name)
 print(klines[-1])
-
+# python3 eastmoney/fetchData/stock.py 
 
 
 # 获取上证的股票日K数据， 测试贵州茅台
