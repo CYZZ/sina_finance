@@ -42,7 +42,7 @@ def load_data_from_jukuang_service():
     fields = ['open', 'close', 'low', 'high', 'volume', 'money', 'factor', 'high_limit', 'low_limit', 'avg',
               'pre_close',
               'paused']
-    df_ETF: DataFrame = get_price('513100.XSHG', start_date='2017-01-01', end_date='2022-01-01', fields=fields,
+    df_ETF: DataFrame = jq.get_price('513100.XSHG', start_date='2017-01-01', end_date='2022-01-01', fields=fields,
                                   panel=False)
     path = "513100_纳指ETF.csv"
     df_ETF.to_csv(path)

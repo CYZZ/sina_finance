@@ -19,7 +19,7 @@ from  eastmoney.kline import kline_test
 class eastStock():
 
     @classmethod
-    def request_shangzheng_shenzheng(self, code: str, ctype=1,klt="101",fqt="0",lmt="1000000"):
+    def request_shangzheng_shenzheng(self, code: str, ctype=1,klt="101",fqt="0",lmt="1000000",end="20500101"):
         """
         请求A股的股票数据,默认请求所有的历史日K数据，
         param:code:股票代码
@@ -27,6 +27,7 @@ class eastStock():
         klt:是k线类型，默认是日K，101是周K,
         fqt:0不复权，1前复权，2后复权
         lmt:获取的数量
+        end:截止日期
         """
         url = "http://22.push2his.eastmoney.com/api/qt/stock/kline/get"
         cb = ""
@@ -38,7 +39,7 @@ class eastStock():
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
             "klt": klt,
             "fqt": fqt,
-            "end": "20500101",
+            "end": end,
             "lmt": lmt,
             "_": "1646568864248"
         }
@@ -54,6 +55,7 @@ class eastStock():
         result =  list(map(lambda kline: kline.split(','), klines))
         print(result[0])
         df = DataFrame(result,columns=fields)
+        df = df.apply(lambda col: pd.to_numeric(col,errors='ignore'))
         return name, df
         #     "klines": [
         #   "2010-03-19,0.97,0.92,0.99,0.92,197373,1182393994.00,11.86,55.93,0.33,70.49",
@@ -61,7 +63,7 @@ class eastStock():
 
     @classmethod
     def test_save_local(self):
-        code = "000852"
+        code = "510300"
         # code = "300015"
         name, df = eastStock.request_shangzheng_shenzheng(code, ctype=1, klt="101", fqt="2")
 
