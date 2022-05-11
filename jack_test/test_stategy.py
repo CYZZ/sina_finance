@@ -4,6 +4,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from Stategy.mygrid import MyGrid
+from GUI.my_chart import MyChart
 from eastmoney.fetchData.stock import eastStock
 
 # MyGrid.get_rolling_rate()
@@ -37,6 +38,9 @@ if __name__ == '__main__':
         elif params == '4':
             print("MyGrid.TrendStrategy()")
             MyGrid.TrendStrategy()
+        elif params == '5':
+            print("show chart")
+            MyChart.showChart()
         else:
             print("test---=== non")
     start_test(sys.argv)

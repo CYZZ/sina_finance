@@ -1,5 +1,6 @@
 # 我的策略，该模块用于测试每个策略的收益率
-from typing import List
+import imp
+from typing import Dict, List
 import matplotlib.pyplot as plt
 
 import sys
@@ -14,153 +15,11 @@ sys.path.insert(0, str(BASE_DIR))
 from matplotlib.dates import date2num
 import pandas as pd
 import numpy as np
-from PyQt5.QtCore import QUrl
-from PyQt5.QtWidgets import *
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-from pyecharts.charts import Line,Bar,Grid, Pie
-import pyecharts.options as opts
-from pyecharts import charts
+
 from pandas import DataFrame, Series, DatetimeIndex
 from plot_test import jukuang_test
 from eastmoney.fetchData.stock import eastStock
-
-class MyChart(QWidget):
-    def __init__(self):
-        super(MyChart,self).__init__()
-        self.initUI()
-        self.mainLayout()
-
-    def initUI(self):
-        self.setGeometry(400, 400, 800, 600)
-        self.setWindowTitle("demo1")
-
-    def mainLayout(self):
-        self.mainhboxLayout = QHBoxLayout(self)
-        self.frame = QFrame(self)
-        self.mainhboxLayout.addWidget(self.frame)
-        self.hboxLayout = QHBoxLayout(self.frame)
-        self.myHtml = QWebEngineView()
-        url = "https://www.baidu.com"
-        # 要使用绝对地址访问文件
-        self.myHtml.load(QUrl("file:///Users/yuze.chi/Downloads/bar-gradient.html"))
-        # 选择使用url打开网页
-        # self.myHtml.load(QUrl(url))
-
-        self.hboxLayout.addWidget(self.myHtml)
-        self.setLayout(self.mainhboxLayout)
-    
-    @classmethod
-    def line_base(self, x: List, fileName: str, retracement: DataFrame, **y) -> Line:
-        '''
-        绘制折线图
-        '''
-        c = (
-            Line()
-            .add_xaxis(x)
-            .set_global_opts(title_opts=opts.TitleOpts(title="收益曲线"),
-                             tooltip_opts=opts.TooltipOpts(is_show=True, trigger='axis', axis_pointer_type='cross'),
-                             yaxis_opts=opts.AxisOpts(name="收益率"),
-                             toolbox_opts=opts.ToolboxOpts(feature={'dataView': {'readOnly': False}, 'magicType': {'type': ['line', 'bar']}}),
-                             axispointer_opts=opts.AxisPointerOpts(is_show=True, label=opts.LabelOpts(is_show=True, background_color='rgb(123,123,123,1)')),
-                             datazoom_opts=[opts.DataZoomOpts(type_='inside', range_start=0, range_end=100, xaxis_index=0),
-                             opts.DataZoomOpts(pos_bottom='50%', range_start=0, range_end=100, xaxis_index=0),
-                             opts.DataZoomOpts(type_='inside', range_start=0, range_end=100, xaxis_index=1),
-                             opts.DataZoomOpts(pos_bottom='0%', range_start=0, range_end=100, xaxis_index=1)],
-                             )
-        )
-        # c.width = "95%"
-        # c.height = "800px"
-        c.page_title = "收益曲线"
-        # 遍历可变的数据，显示所有
-        
-        my_markpoint_data = []
-        my_markarea_data = []
-        for row in retracement.itertuples():
-            begin_date = getattr(row, 'begin_date')
-            begin_number =  getattr(row, 'begin_number')
-            end_date = getattr(row, 'end_date')
-            end_number = getattr(row, 'end_number')
-            rate = getattr(row, 'retracement')
-            my_markpoint_data.append(opts.MarkPointItem(name='test', coord=[begin_date, begin_number], value=begin_number))
-            my_markpoint_data.append(opts.MarkPointItem(name='test', coord=[end_date, end_number], value=end_number))
-            my_markarea_data.append(opts.MarkAreaItem(name=round(-rate*100, 2), x=(begin_date, end_date), y=(end_number, begin_number)))
-            
-        # 开始绘制折线
-        for k, v in y.items():
-            
-            # color = line_colors.pop
-            c.add_yaxis(k, v,label_opts=opts.LabelOpts(is_show=True,interval=10),
-                        linestyle_opts=opts.LineStyleOpts(width=1.5),
-                        xaxis_index=0,
-                        yaxis_index=0
-                        # markline_opts=opts.MarkLineOpts(data=[opts.MarkLineItem(name="test", x="2021-09-13", symbol_size=20), opts.MarkLineItem(name="test", x="2021-10-25", symbol_size=20)]),
-                        # markpoint_opts=opts.MarkPointOpts(data=[opts.MarkPointItem(name='test', coord=["2021-10-25",3],value=2)])
-                        )
-        # 需要有数据之后设置的属性才能生效
-        c.set_series_opts(markarea_opts=opts.MarkAreaOpts(itemstyle_opts=opts.ItemStyleOpts(color='rgba(20, 255, 20, 0.1)'),
-                                                        #   data=[opts.MarkAreaItem(name='morning Peak', x=('2020-06-03', '2021-07-09'))]
-                                                        data= my_markarea_data,
-                                                        label_opts=opts.LabelOpts(color='black'),
-                                                        is_silent=True
-                                                          ),
-                        #   markpoint_opts=opts.MarkPointOpts(data=[opts.MarkPointItem(type_='max', name='最大值'), opts.MarkPointItem(type_='min',name='最小值'), opts.MarkPointItem(name='test', value=3,x=30,y=3)])
-                        # 设置显示的标签样式，
-                        # label_opts=opts.LabelOpts(interval=100),
-                        # tooltip_opts=opts.marklin
-                          )
-        # 用于计算年收益
-        rate_df = DataFrame(y)
-        rate_df["date"] = x
-        rate_df.set_index('date')
-
-        c1 = self.gender_mi(pos_top='55%',x=x,y=y)
-        # c.overlap(c1)
-        grid = Grid(init_opts=opts.InitOpts(width="95%", height="1200px", page_title="轮动策略"))
-
-        grid.add(c, grid_opts=opts.GridOpts(pos_bottom="55%"))
-        grid.add(c1, grid_opts=opts.GridOpts(pos_top="55%"))
-
-        grid.render(fileName)
-        # c.render(fileName)
-        return c
-
-    @classmethod
-    def gender_mi(self, x: List, y:dict, pos_top='60%'):
-        # 获取每年的最后一个交易日
-        print("开始获取月份第一个交易日数据：---=====---")
-        offset = pd.tseries.offsets.YearEnd()
-        
-        bar = (Bar()
-               .set_global_opts(title_opts=opts.TitleOpts(title="年收益", pos_top=pos_top),
-                                legend_opts=opts.LegendOpts(pos_top=pos_top),
-                                # 目前发现只能在第一个图标设置缩放属性
-                                # datazoom_opts=[opts.DataZoomOpts(type_='inside', range_start=0, range_end=100, xaxis_index=[0, 1, 2], yaxis_index=[0, 1, 2]),
-                                #                opts.DataZoomOpts(pos_bottom='50%', range_start=0, range_end=100, xaxis_index=1, yaxis_index=1)],
-                                )
-               )
-
-        has_set_xaxis = False
-        for k, v in y.items():
-            ser = Series(v,index=x)
-            ser = ser.groupby(offset.rollforward,group_keys=False).apply(lambda t: t[t.index == t.index.max()])
-            if not has_set_xaxis:
-                # 只要设置一次X坐标
-                bar.add_xaxis(ser.index.tolist()[1:])
-                has_set_xaxis = True
-            year_rate = ser/ser.shift(1)
-            bar.add_yaxis(k,((year_rate-1)*100).round(3).tolist()[1:],xaxis_index=1,yaxis_index=1)
-        bar.set_series_opts(label_opts=opts.LabelOpts(formatter='{c}%'))
-        return bar
-
-    @classmethod
-    def showChart(self):
-        app = QApplication(sys.argv)
-        ex = MyChart()
-        ex.show()
-        sys.exit(app.exec_())
-
-
-
+# from GUI.my_chart import MyChart
 
 class MyGrid:
 
@@ -291,13 +150,9 @@ class MyGrid:
         plt.plot(plt_x_arr,zhongxin_arr,label='zhongxin')
         plt.legend()
         plt.show()
-        # close = zhongxin_df.loc['2003-01-29']['close']
-        # print(close)
-        # print(type(close))
 
     @classmethod
-    def XBXRotationStrategy(self, hushen300_df: DataFrame, chuangye_df: DataFrame, test_count=100, trading_days=20,
-                            hushen300_name="1.沪深300", chuangye_name="2.创业板", fileName="../测试折线图-创业板-沪深300.html", testRate=0.2, **kwargs):
+    def XBXRotationStrategy(self, hushen300_df: DataFrame, chuangye_df: DataFrame, test_count=100, trading_days=20, sub_rate=3.0, testRate=0.2, **kwargs):
         '''
         邢不行的轮动策略：
         在两个品种之间轮动，通过比较过去的N个交易日的涨跌幅，如果大盘涨幅大于小盘则下日持有大盘，否则持有小盘；
@@ -308,8 +163,6 @@ class MyGrid:
         test_count: 回测的天数
         trading_days: 短期的涨跌幅计算周期
         '''
-        # hushen300_df = pd.read_csv('unused/000300_沪深300后复权日K.csv', index_col=1)
-        # chuangye_df = pd.read_csv('unused/399006_创业板指后复权日K.csv', index_col=1)
         
         print(hushen300_df.head())
         print(chuangye_df.head())
@@ -372,13 +225,30 @@ class MyGrid:
                              hushen300_df['涨跌幅度'], chuangye_ten_rate, hushen300_ten_rate, chuangye_average_bigger, hushen300_arerage_bigger], axis=1)
         combo_df.columns = ["pre_isBigger", "chuangye_sum_rate", "hushen300_sum_rate",
                             "chuangye_day_rate", "hushen300_day_df", "chuangye_ten_rate", "hushen300_ten_rate", "chuangye_average_bigger", "hushen300_arerage_bigger"]
+        combo_df.sort_index(axis=0,inplace=True)
+        combo_df = combo_df[-test_count:]
+        
+        # 统计对各个指数看多看空
+        trading_count = {"long_chuangye": 0, "short_chuangye": 0, "long_hushen300": 0, "short_hushen300": 0}
+        # 计算贡献的收益率
+        revenue_contribution = {"long_chuangye": 1, "short_chuangye": 1, "long_hushen300": 1, "short_hushen300": 1}
         # 修改涨跌幅，如果两个板块前20个交易日收益率为负数，后面就清仓，也就是收益率为0 ，这样可以控制回撤
         def getNew_chuanye_zdf(x):
             """
             如前20日创业板收益率大于0那么保留仓位，否则下一交易日就空仓
             """
             # return x["chuangye_day_rate"]
-            return x["chuangye_day_rate"] * long_leverage if x["chuangye_sum_rate"] > 3.0 and x["chuangye_sum_rate"] < 30 else 0 - x["hushen300_day_df"] * short_leverage
+            if x["chuangye_sum_rate"] > sub_rate and x["chuangye_sum_rate"] < 30:
+                if x["pre_isBigger"]:
+                    trading_count["long_chuangye"] = trading_count["long_chuangye"] + 1
+                    revenue_contribution["long_chuangye"] = revenue_contribution["long_chuangye"] * (1+x["chuangye_day_rate"]/100.0 * long_leverage)
+                return x["chuangye_day_rate"] * long_leverage
+            else:
+                if x["pre_isBigger"]:
+                    trading_count["short_hushen300"] = trading_count["short_hushen300"] + 1
+                    revenue_contribution["short_hushen300"] = revenue_contribution["short_hushen300"] * (1 - x["hushen300_day_df"]/100.0 * short_leverage)
+                return 0 - x["hushen300_day_df"] * short_leverage
+
         chuangye_zdf = combo_df.apply(getNew_chuanye_zdf,axis=1)
 
         def getNew_hushen300_zdf(x):
@@ -386,9 +256,19 @@ class MyGrid:
             如前20日沪深300收益率大于0保留仓位，否则下一交易日就空仓
             """
             # return x["hushen300_day_df"]
-            return x["hushen300_day_df"] * long_leverage if x["hushen300_sum_rate"] > 3.0 and x["hushen300_sum_rate"] < 30 else 0 - x["chuangye_day_rate"] * short_leverage
+            if x["hushen300_sum_rate"] > sub_rate and x["hushen300_sum_rate"] < 30:
+                if not x["pre_isBigger"]:
+                    trading_count["long_hushen300"] = trading_count["long_hushen300"] + 1
+                    revenue_contribution["long_hushen300"] = revenue_contribution["long_hushen300"] * (1+x["hushen300_day_df"]/100.0 * long_leverage)
+                return x["hushen300_day_df"] * long_leverage
+            else:
+                if not x["pre_isBigger"]:
+                    trading_count["short_chuangye"] = trading_count["short_chuangye"] + 1
+                    revenue_contribution["short_chuangye"] = revenue_contribution["short_chuangye"] * (1 - x["chuangye_day_rate"]/100.0 * short_leverage)
+                return 0 - x["chuangye_day_rate"] * short_leverage
+
         hushen300_zdf = combo_df.apply(getNew_hushen300_zdf,axis=1)
-        
+        print("revenue_contribution=",revenue_contribution)
         chuangye_rate = pre_isBigger * chuangye_zdf
         
         hushen300_rate = pre_isBigger.apply(lambda x: not x) * hushen300_zdf 
@@ -453,10 +333,11 @@ class MyGrid:
         print("策略最大回撤=", self.get_max_withdraw(Series(total_arr, index=x_arr)))
         # statistical_retracement_data(ser, rate=0.3)
         retracement_df = self.statistical_retracement_data(Series(total_arr, index=x_arr), rate=testRate)
-        
-        y = {"3.轮动策略": total_arr, chuangye_name: chuangye_arr, hushen300_name: hushen300_arr}
+        # return x_arr, total_arr
+        y = (total_arr, chuangye_arr, hushen300_arr)
         # 开始存入到文件，并绘制成折线图
-        MyChart.line_base(x=x_arr, fileName=fileName, retracement=retracement_df, **y)
+        # MyChart.line_base(x=x_arr, fileName=fileName,html_title=html_title, retracement=retracement_df, trading_count=trading_count, revenue_contribution=revenue_contribution, **y)
+        return x_arr, y, retracement_df, trading_count, revenue_contribution,
         
     @classmethod
     def XBXTestLocalFile(self):
@@ -465,28 +346,36 @@ class MyGrid:
         """
         hushen300_df = pd.read_csv('unused/000300_沪深300后复权日K.csv', index_col=1)
         chuangye_df = pd.read_csv('unused/399006_创业板指后复权日K.csv', index_col=1)
-        self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen300_df, test_count=2800, trading_days=20,
+        return self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen300_df, test_count=2800, trading_days=20,
                                  hushen300_name="1.沪深300", chuangye_name="2.创业板", fileName="../测试结果-创业板-沪深300_0408_1.5_0.5.html",long=1.5, short=.5)
     
     @classmethod
-    def XBXTestServiceData(self):
-        
-        test_days = 1300
-        hushen_name, hushen_df = eastStock.request_shangzheng_shenzheng(510300, ctype=1, klt="101", fqt="2", lmt=test_days)
-        chuangye_name, chuangye_df = eastStock.request_shangzheng_shenzheng(159949, ctype=0, klt="101", fqt="2", lmt=test_days)
+    def XBXTestServiceData(self, sub_rate=3.0, stocks=((510300, "1"), (159949, "0")), test_days=1300):
+        hushen_name, hushen_df = eastStock.request_shangzheng_shenzheng(stocks[0][0], ctype=stocks[0][1], klt="101", fqt=2, lmt=test_days)
+        chuangye_name, chuangye_df = eastStock.request_shangzheng_shenzheng(stocks[1][0], ctype=stocks[1][1], klt="101", fqt=stocks[1][1], lmt=test_days)
         hushen_df.set_index('date', inplace=True)
         chuangye_df.set_index('date', inplace=True)
 
-        today = datetime.datetime.today()
-        date_str = today.strftime('%Y-%m-%d')
-        week_list = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
-        my_weak = week_list[today.weekday()]
         # 保存临时数据用于人工比对交易
         # hushen_df.to_csv("../{}_短期行情数据{}.csv".format(hushen_name,date_str))
         # chuangye_df.to_csv("../{}_短期行情数据{}.csv".format(chuangye_name,date_str))
-
-        self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen_df, test_count=test_days-20, hushen300_name="1.{}".format(hushen_name), chuangye_name="2.{}".format(chuangye_name), fileName="../测试结果_{hushen}_{chuangye}_{xinqi}_{date}.html".
-                                 format(hushen=hushen_name, chuangye=chuangye_name, xinqi=my_weak, date=date_str), long=1.5, short=.5,testRate=0.1)
+        
+        return self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen_df, test_count=test_days-20, sub_rate=sub_rate, long=1.5, short=.5, testRate=0.1) + (chuangye_name, hushen_name)
+        return
+        my_params = []
+        for sub_rate in range(-30,30):
+            my_rate = sub_rate/10.0
+            print("myrate=",my_rate)
+            x,y = self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen_df, test_count=test_days-20,sub_rate=my_rate, hushen300_name="1.{}".format(hushen_name), chuangye_name="2.{}".format(chuangye_name), fileName="../测试结果_{hushen}_{chuangye}_service.html".
+                                    format(hushen=hushen_name, chuangye=chuangye_name),html_title="轮动策略-{xinqi}-{date}".format(xinqi=my_weak,date=date_str), long=1.5, short=.5,testRate=0.1)
+            mystack = np.stack([x,y],axis=1).tolist()
+            my_params += [[my_rate]+obj for obj in mystack]
+        c = (
+            Line3D()
+            .add("test",data=my_params)
+        )
+        c.render("../my3dline.html")
+        # print("x={},y={}".format(x,y))
 
     @classmethod
     def TrendStrategy(self):
@@ -544,7 +433,7 @@ class MyGrid:
         x_arr = stock_zdf.index.tolist()
         y={"1.趋势": total_arr, "2.长期持有": origin_arr}
         # 开始存入到文件，并绘制成折线图
-        MyChart.line_base(x=x_arr,fileName="../趋势策略收益.html", **y)
+        return x_arr, y
 
     @classmethod
     def MaxDrawdown(self,return_list):
@@ -599,10 +488,6 @@ class MyGrid:
         current_number = 0
         end_date = datas.index[0]
         print("第一个数据date={},obj={}".format(history_high_date, history_high))
-        
-        # history_df = DataFrame(columns=["begin_date", "end_date", "retracement",
-        #                         "begin_number", "end_number"])
-        # print("history_df_test=",history_df)
 
         begin_dates = []
         end_dates = []
@@ -626,8 +511,6 @@ class MyGrid:
                 history_high = obj
                 temp_high_rate = 0 # 重置
                 current_number = 0
-                # print('history_high_date=',history_high_date)
-            
             elif obj < history_high:
                 current_rate = 1 - obj / history_high
                 
@@ -636,8 +519,6 @@ class MyGrid:
                     temp_high_rate = current_rate
                     current_number = obj
                     end_date = date
-                    # print("获取回撤大于上次且大于:",rate)
-                    # print("date={},temp_high_rate={},rate={}".format(date, temp_high_rate, rate))
         # 如果最后一次回撤也满足条件，也要加入
         if temp_high_rate > rate:
             begin_dates.append(history_high_date)
