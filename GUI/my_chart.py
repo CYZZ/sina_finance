@@ -1,9 +1,10 @@
 from pandas import *
 import pandas as pd
 from typing import Dict, List
+import json
 from PyQt5.QtCore import QUrl,Qt,QThread,pyqtSignal
 from PyQt5.QtWidgets import *
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 from pyecharts.charts import Line,Bar,Grid, Pie,Line3D
 import datetime,time
 import sys
@@ -11,6 +12,8 @@ import os
 
 
 from pathlib import Path
+
+from sqlalchemy import false
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
@@ -44,7 +47,7 @@ class MyChart(QWidget):
         self.setLayout(self.mainhboxLayout)
     
     @classmethod
-    def line_base(self, x: List, fileName: str,retracement: DataFrame, trading_count: Dict, revenue_contribution: Dict,html_title="轮动策略", **y) -> Line:
+    def line_base(self, x: List, fileName: str,retracement: DataFrame, trading_count: Dict, revenue_contribution: Dict, sum_rate: tuple[List,List],html_title="轮动策略", **y) -> Line:
         '''
         绘制折线图
         '''
@@ -56,8 +59,8 @@ class MyChart(QWidget):
                              yaxis_opts=opts.AxisOpts(name="收益率"),
                              toolbox_opts=opts.ToolboxOpts(feature={'dataView': {'readOnly': False}, 'magicType': {'type': ['line', 'bar']}}),
                              axispointer_opts=opts.AxisPointerOpts(is_show=True, label=opts.LabelOpts(is_show=True, background_color='rgb(123,123,123,1)')),
-                             datazoom_opts=[opts.DataZoomOpts(type_='inside', range_start=0, range_end=100, xaxis_index=0),
-                             opts.DataZoomOpts(pos_bottom='50%', range_start=0, range_end=100, xaxis_index=0),
+                             datazoom_opts=[opts.DataZoomOpts(type_='inside', range_start=0, range_end=100, xaxis_index=[0,3]),
+                             opts.DataZoomOpts(pos_bottom='50%', range_start=0, range_end=100, xaxis_index=[0,3]),
                              opts.DataZoomOpts(type_='inside', range_start=50, range_end=100, xaxis_index=1),
                              opts.DataZoomOpts(pos_bottom='0%', range_start=50, range_end=100, xaxis_index=1)],
                             #  visualmap_opts=opts.VisualMapOpts(pieces=[{"min": 2, "max": 3,'color':'green'},])
@@ -108,29 +111,30 @@ class MyChart(QWidget):
         rate_df["date"] = x
         rate_df.set_index('date')
 
-        c1 = self.gender_bar(pos_top='55%',x=x,y=y)
+        c1 = self.gender_bar(pos_top='75%',x=x,y=y)
         c2 = self.gender_pie(trading_count=trading_count)
         c3 = self.gender_contribution_bar(revenue_contribution=revenue_contribution,pos_top="70%",pos_left="66%")
+        c4 = self.gender_sum_rate_line(x,sum_rate)
         # c.overlap(c1)
         grid = Grid(init_opts=opts.InitOpts(width="95%", height="1000px", page_title=html_title))
 
         c3.overlap(c2)
         
         grid.add(c, grid_opts=opts.GridOpts(pos_bottom="55%"))
-        grid.add(c1, grid_opts=opts.GridOpts(pos_top="55%",pos_right="35%"))
+        grid.add(c1, grid_opts=opts.GridOpts(pos_top="75%",pos_right="35%"))
         grid.add(c3,grid_opts=opts.GridOpts(pos_top="75%",pos_left="70%"))
-
+        grid.add(c4, grid_opts=opts.GridOpts(pos_top="65%",pos_bottom="50%"))
         grid.render(fileName)
         # c.render(fileName)
         return c
 
     @classmethod
-    def gender_bar(self, x: List, y:dict, pos_top='60%'):
+    def gender_bar(self, x: List, y:dict, pos_top='75%'):
         # 获取每年的最后一个交易日
         offset = pd.tseries.offsets.YearEnd()
         bar = (Bar()
                .set_global_opts(title_opts=opts.TitleOpts(title="年收益", pos_top=pos_top),
-                                legend_opts=opts.LegendOpts(pos_top=pos_top),
+                                legend_opts=opts.LegendOpts(pos_top=pos_top,is_show=False),
                                 tooltip_opts=opts.TooltipOpts())
                )
 
@@ -151,7 +155,7 @@ class MyChart(QWidget):
     def gender_contribution_bar(self, revenue_contribution: Dict, pos_top='30%',pos_left="50%"):
         bar = (Bar()
                .set_global_opts(title_opts=opts.TitleOpts(title="收益贡献率", pos_top=pos_top, pos_left=pos_left),
-                                legend_opts=opts.LegendOpts(type_='scroll', pos_bottom='5%', orient='vertical', pos_top='65%', pos_right='0%', is_show=True),
+                                legend_opts=opts.LegendOpts(type_='scroll', pos_bottom='5%', orient='vertical', pos_top='75%', pos_right='0%', is_show=True),
                                 xaxis_opts=opts.AxisOpts(axislabel_opts=opts.LabelOpts(rotate=30)),
                                 )
                )
@@ -164,7 +168,7 @@ class MyChart(QWidget):
     def gender_pie(self, trading_count:Dict) ->Pie:
         c = (Pie()
              .add("交易频次", data_pair=[list(z) for z in zip(trading_count.keys(), trading_count.values())],
-             center=['85%', '65%'], radius='15%',
+             center=['85%', '75%'], radius='10%',
              tooltip_opts=opts.TooltipOpts(formatter='{a} <br/>{b} : {c} ({d}%)', background_color='#0000ff55'),)
              .set_global_opts(legend_opts=opts.LegendOpts(type_='scroll', pos_bottom='5%', orient='vertical', pos_top='65%', pos_right='0%', is_show=False),)
              .set_series_opts(label_opts=opts.LabelOpts(is_show=True, position='outside'))
@@ -172,14 +176,36 @@ class MyChart(QWidget):
         return c
     
     @classmethod
+    def gender_sum_rate_line(self,x:List,sum_rate:tuple[List,List]) -> Line:
+        c = (
+            Line()
+            .set_global_opts(legend_opts=opts.LegendOpts(is_show=False))
+            .add_xaxis(x)
+        )
+        c.add_yaxis("沪深300", sum_rate[0], label_opts=opts.LabelOpts(is_show=True),
+                    linestyle_opts=opts.LineStyleOpts(width=1.5),
+                    xaxis_index=3,
+                    yaxis_index=3
+                    )
+        c.add_yaxis("创业板", sum_rate[1], label_opts=opts.LabelOpts(is_show=True),
+                    linestyle_opts=opts.LineStyleOpts(width=1.5),
+                    xaxis_index=3,
+                    yaxis_index=3
+                    )
+        return c
+
+    @classmethod
     def showChart(self):
         app = QApplication(sys.argv)
         # ex = MyChart()
         # ex.show()
         window = MyWindowFive()
         window.resize(1200,1400)
-        window.move(500,100)
-        window.setGeometry(QApplication.desktop().availableGeometry())
+        # window.move(500,100)
+        screen = QDesktopWidget().screenGeometry()
+        size = window.geometry()
+        # target_point = 
+        window.move(int((screen.width() - size.width())/2), int((screen.height() - size.height())/2))
         window.show()
         sys.exit(app.exec_())
 
@@ -308,7 +334,13 @@ class MyWindowFive(QWidget):
         rightSplitter.addWidget(textEdit)
         self.myHtml = QWebEngineView()
         # 要使用绝对地址访问文件
-        self.myHtml.load(QUrl("file:///Users/yuze.chi/Desktop/jy_test/PythonDataScience/测试结果_沪深300ETF_创业板50ETF_service.html"))
+        self.myHtml.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled,False)
+        # self.myHtml.load(QUrl("file:///Users/yuze.chi/Desktop/jy_test/PythonDataScience/测试结果_沪深300ETF_创业板50ETF_service.html"))
+        self.myHtml.load(QUrl("http://localhost:8989/index.html"))
+        # QWebEngineSettings.setAttribute
+        self.myHtml.settings().resetAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled)
+        self.myHtml.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled,True)
+        # .setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled,false)
         rightSplitter.addWidget(self.myHtml)
         rightSplitter.setStretchFactor(0,1)
         rightSplitter.setStretchFactor(1,8)
@@ -317,10 +349,15 @@ class MyWindowFive(QWidget):
         login_button = QPushButton("登录")
         login_button.clicked.connect(self.login)
         register_button = QPushButton("注册")
+        register_button.clicked.connect(self.register)
 
         self.sub_rate_edit = QLineEdit()
         self.sub_rate_edit.setPlaceholderText("请输入sub_rate……")
         self.sub_rate_edit.setText("3")
+
+        self.trading_day_edit = QLineEdit()
+        self.trading_day_edit.setPlaceholderText("请输入回测天数……")
+        self.trading_day_edit.setText("1300")
 
         self.stock1_edit = QLineEdit()
         self.stock1_edit.setPlaceholderText("请输入第一个stock……")
@@ -332,6 +369,7 @@ class MyWindowFive(QWidget):
 
         form_layout = QFormLayout()
         form_layout.addRow("sub_rate", self.sub_rate_edit)
+        form_layout.addRow("test_days", self.trading_day_edit)
         form_layout.addRow("stock1", self.stock1_edit)
         form_layout.addRow("stock2", self.stock2_edit)
 
@@ -359,7 +397,12 @@ class MyWindowFive(QWidget):
         self.thread = myQThread(self.target_func,"test11")
         self.thread.mySignal.connect(self.mytestLogin)
         self.thread.start()
-        
+    
+    def register(self):
+        print("开始注册了")
+        self.myHtml.load(QUrl("http://localhost:8989/index.html"))
+        self.myHtml.reload()
+
     def target_func(self,param):
         print("开始要执行耗时操作了！！！！！")
         print("param=",param)
@@ -368,13 +411,17 @@ class MyWindowFive(QWidget):
             sub_rate = float(self.sub_rate_edit.text())
         except:
             sub_rate = 3
+        try:
+            test_day = int(self.trading_day_edit.text())
+        except:
+            test_day = 1300
         # try:
         stock1 = self.stock1_edit.text().split(" ")
         stock2 = self.stock2_edit.text().split(" ")
         stocks = (stock1, stock2)
         print("stocks===",stocks)
 
-        x, y, retracement_df, trading_count, revenue_contribution, chuangye_name, hushen_name = MyGrid.XBXTestServiceData(stocks=stocks, sub_rate=sub_rate)
+        x, y, retracement_df, trading_count, revenue_contribution,hushen_sum_rate,chuangye_sum_rate, chuangye_name, hushen_name = MyGrid.XBXTestServiceData(stocks=stocks, sub_rate=sub_rate,test_days=test_day)
 
         today = datetime.datetime.today()
         date_str = today.strftime('%Y-%m-%d-%H:%M')
@@ -388,14 +435,41 @@ class MyWindowFive(QWidget):
         chuangye_name="1.{}".format(chuangye_name)
         hushen_name="2.{}".format(hushen_name)
         y = dict(zip((rotate_name,chuangye_name,hushen_name),y))
-        MyChart.line_base(x=x, fileName=self.fileName,html_title=html_title, retracement=retracement_df, trading_count=trading_count, revenue_contribution=revenue_contribution, **y)
+        # MyChart.line_base(x=x, fileName=self.fileName,html_title=html_title, retracement=retracement_df, trading_count=trading_count, revenue_contribution=revenue_contribution,sum_rate=[hushen_sum_rate,chuangye_sum_rate], **y)
         
+        # 计算年收益
+        my_year_rate = {}
+        my_values = {}
+        offset = pd.tseries.offsets.YearEnd()
+        for k, v in y.items():
+            ser = Series(v,index=x)
+            ser = ser.groupby(offset.rollforward,group_keys=False).apply(lambda t: t[t.index == t.index.max()])
+            year_rate = ser/ser.shift(1)
+            my_year_rate["x"] = ser.index.tolist()[1:]
+            my_values[k] = ((year_rate-1)*100).round(3).tolist()[1:]
+        my_year_rate["values"] = my_values
+        # test 写入到json文件
+        myDic = {
+            "x": x,
+            "y": y,
+            "retracement": retracement_df.to_dict('list'),
+            "trading_count": trading_count,
+            "revenue_contribution": revenue_contribution,
+            "sum_rate": [hushen_sum_rate, chuangye_sum_rate],
+            "year_rate":my_year_rate
+        }
+        json_str = json.dumps(myDic)
+        with open('./MyHTMLChart/json/test_mytest.json','w') as json_file:
+            json_file.write(json_str)
         print("执行完成了")
+        
         
     def mytestLogin(self):
         print("已经接收到信号开始刷新UI")
         # self.myHtml.reload()
-        self.myHtml.load(QUrl("file://"+os.path.abspath(self.fileName)))
+        self.myHtml.load(QUrl("http://localhost:8989/index.html"))
+        
+        # self.myHtml.load(QUrl("file://"+os.path.abspath(self.fileName)))
         
     
 
