@@ -1,8 +1,11 @@
+from select import kevent
 from pandas import *
 import pandas as pd
 from typing import Dict, List
 import json
-from PyQt5.QtCore import QUrl,Qt,QThread,pyqtSignal
+from PyQt5.QtGui import *
+from PyQt5.Qt import *
+from PyQt5.QtCore import QUrl,Qt,QThread,pyqtSignal, QTimerEvent
 from PyQt5.QtWidgets import *
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 from pyecharts.charts import Line,Bar,Grid, Pie,Line3D
@@ -197,6 +200,7 @@ class MyChart(QWidget):
     @classmethod
     def showChart(self):
         app = QApplication(sys.argv)
+        app.setWindowIcon(QIcon("soccer.ico"))
         # ex = MyChart()
         # ex.show()
         window = MyWindowFive()
@@ -329,9 +333,9 @@ class MyWindowFive(QWidget):
         rightSplitter = QSplitter(self)
         # 垂直分割
         rightSplitter.setOrientation(Qt.Orientation.Vertical)
-        textEdit = QTextEdit()
-        textEdit.setText("Window2")
-        rightSplitter.addWidget(textEdit)
+        self.textEdit = QTextEdit()
+        self.textEdit.setText("Window2")
+        rightSplitter.addWidget(self.textEdit)
         self.myHtml = QWebEngineView()
         # 要使用绝对地址访问文件
         self.myHtml.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled,False)
@@ -340,7 +344,7 @@ class MyWindowFive(QWidget):
         # QWebEngineSettings.setAttribute
         self.myHtml.settings().resetAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled)
         self.myHtml.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled,True)
-        # .setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled,false)
+        self.myHtml.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled,False)
         rightSplitter.addWidget(self.myHtml)
         rightSplitter.setStretchFactor(0,1)
         rightSplitter.setStretchFactor(1,8)
@@ -350,32 +354,59 @@ class MyWindowFive(QWidget):
         login_button.clicked.connect(self.login)
         register_button = QPushButton("注册")
         register_button.clicked.connect(self.register)
+        change_button = QPushButton("切换指数")
+        change_button.clicked.connect(self.changeIndex)
+        self.has_change = False
 
         self.sub_rate_edit = QLineEdit()
         self.sub_rate_edit.setPlaceholderText("请输入sub_rate……")
         self.sub_rate_edit.setText("3")
+        self.sub_rate_edit.setValidator(QDoubleValidator(-50, 50, 2))
+        self.sub_rate_edit.returnPressed.connect(self.login)
 
-        self.trading_day_edit = QLineEdit()
-        self.trading_day_edit.setPlaceholderText("请输入回测天数……")
-        self.trading_day_edit.setText("1300")
+        self.trading_day_sp = QSpinBox()
+        self.trading_day_sp.setRange(40, 50000)
+        self.trading_day_sp.setValue(200)
+        self.trading_day_sp.setSingleStep(100)
+        self.trading_day_sp.setKeyboardTracking(False)
+        self.trading_day_sp.valueChanged.connect(self.login)
+        self.trading_day_sp.lineEdit().returnPressed.connect(self.login)
 
         self.stock1_edit = QLineEdit()
         self.stock1_edit.setPlaceholderText("请输入第一个stock……")
         self.stock1_edit.setText("510300 1")
+        self.stock1_edit.returnPressed.connect(self.login)
 
         self.stock2_edit = QLineEdit()
         self.stock2_edit.setPlaceholderText("请输入第二个stock……")
         self.stock2_edit.setText("159949 0")
+        self.stock2_edit.returnPressed.connect(self.login)
 
+        self.roll_day_sp = QSpinBox()
+        self.roll_day_sp.setPrefix("rollday: ")
+        self.roll_day_sp.setMinimumWidth(100)
+        self.roll_day_sp.setValue(20)
+        self.roll_day_sp.lineEdit().returnPressed.connect(self.logout_click)
+        self.roll_day_sp.setKeyboardTracking(False) # 不响应输入的事件
+        self.roll_day_sp.valueChanged.connect(self.logout_click) # 响应加减数字的事件
+        
+        logout_button = QPushButton("登出")
+        logout_button.clicked.connect(self.logout_click)
+        
         form_layout = QFormLayout()
+        # 设置子控件的自动拉伸到flow的最大宽度
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         form_layout.addRow("sub_rate", self.sub_rate_edit)
-        form_layout.addRow("test_days", self.trading_day_edit)
+        form_layout.addRow("test_days", self.trading_day_sp)
         form_layout.addRow("stock1", self.stock1_edit)
         form_layout.addRow("stock2", self.stock2_edit)
+        form_layout.addRow("roll_day", self.roll_day_sp)
 
         vLayout.addWidget(login_button)
         vLayout.addWidget(register_button)
+        vLayout.addWidget(change_button)
         vLayout.addLayout(form_layout)
+        vLayout.addWidget(logout_button)
 
         vLayout.addStretch()
         widge = QWidget()
@@ -400,8 +431,32 @@ class MyWindowFive(QWidget):
     
     def register(self):
         print("开始注册了")
-        self.myHtml.load(QUrl("http://localhost:8989/index.html"))
-        self.myHtml.reload()
+        # self.myHtml.load(QUrl("http://localhost:8989/index.html"))
+        # self.myHtml.reload()
+        
+        self.myHtml.page().runJavaScript('completeAndReturnName();', self.js_callback)
+
+    def changeIndex(self):
+        if self.has_change:
+            self.stock1_edit.setText("510300 1")
+            self.stock2_edit.setText("159949 0")
+        else:
+            self.stock1_edit.setText("000300 1")
+            self.stock2_edit.setText("399006 0")
+        self.has_change = not self.has_change
+    
+    def js_callback(self,result):
+        print(result)
+
+    def logout_click(self):
+        print("start logout")
+        stock1 = self.stock1_edit.text().split(" ")
+        stock2 = self.stock2_edit.text().split(" ")
+        roll_day = self.roll_day_sp.value()
+        result = MyGrid.get_rolling_rate(stock1, stock2, roll_day)
+        self.textEdit.setText(result[0] + '\n\n' + result[1])
+        print(result)
+
 
     def target_func(self,param):
         print("开始要执行耗时操作了！！！！！")
@@ -411,11 +466,9 @@ class MyWindowFive(QWidget):
             sub_rate = float(self.sub_rate_edit.text())
         except:
             sub_rate = 3
-        try:
-            test_day = int(self.trading_day_edit.text())
-        except:
-            test_day = 1300
-        # try:
+            
+        test_day = self.trading_day_sp.value()
+        
         stock1 = self.stock1_edit.text().split(" ")
         stock2 = self.stock2_edit.text().split(" ")
         stocks = (stock1, stock2)
@@ -446,7 +499,7 @@ class MyWindowFive(QWidget):
             ser = ser.groupby(offset.rollforward,group_keys=False).apply(lambda t: t[t.index == t.index.max()])
             year_rate = ser/ser.shift(1)
             my_year_rate["x"] = ser.index.tolist()[1:]
-            my_values[k] = ((year_rate-1)*100).round(3).tolist()[1:]
+            my_values[k] = ((year_rate-1)*100).round(1).tolist()[1:]
         my_year_rate["values"] = my_values
         # test 写入到json文件
         myDic = {
@@ -458,16 +511,28 @@ class MyWindowFive(QWidget):
             "sum_rate": [hushen_sum_rate, chuangye_sum_rate],
             "year_rate":my_year_rate
         }
-        json_str = json.dumps(myDic)
+        json_str = json.dumps(myDic, ensure_ascii=False)
         with open('./MyHTMLChart/json/test_mytest.json','w') as json_file:
             json_file.write(json_str)
         print("执行完成了")
         
+    def keyPressEvent(self, a0: QKeyEvent) -> None:
+        """
+        QWidge自带的方法，重写监听点击
+        """
+        print(a0)
+        # 在mac上command键盘是ControlModifier，control对应的Meta
+        if a0.modifiers() == Qt.KeyboardModifier.ControlModifier and a0.key() == Qt.Key.Key_R:
+            print("开始按了组合键command+R")
+            self.myHtml.reload()
         
+        return super().keyPressEvent(a0)
+
     def mytestLogin(self):
         print("已经接收到信号开始刷新UI")
         # self.myHtml.reload()
-        self.myHtml.load(QUrl("http://localhost:8989/index.html"))
+        # self.myHtml.load(QUrl("http://localhost:8989/index.html"))
+        self.myHtml.page().runJavaScript('completeAndReturnName();', self.js_callback)
         
         # self.myHtml.load(QUrl("file://"+os.path.abspath(self.fileName)))
         

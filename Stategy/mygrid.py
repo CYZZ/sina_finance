@@ -1,5 +1,4 @@
 # 我的策略，该模块用于测试每个策略的收益率
-import imp
 from typing import Dict, List
 import matplotlib.pyplot as plt
 
@@ -7,6 +6,8 @@ import sys
 from pathlib import Path
 import time
 import datetime
+
+from sqlalchemy import false
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
@@ -69,20 +70,20 @@ class MyGrid:
         print(tack_series)
 
     @classmethod
-    def get_rolling_rate(self):
-        trading_days = 20
+    def get_rolling_rate(self, stock1=('000300', 1), stock2=('399006', 0),trading_days = 20):
         # 获取沪深300数据
-        name, hushen300_df = eastStock.request_shangzheng_shenzheng('000300', ctype=1, klt="101", fqt="2",lmt='40')
+        hushen_name, hushen300_df = eastStock.request_shangzheng_shenzheng(stock1[0], ctype=stock1[1], klt="101", fqt="2",lmt='40')
         hushen300_df.set_index('date',inplace=True)
         hushen300_sum_rate = hushen300_df['涨跌幅度'].rolling(trading_days).sum()
-        print(name,hushen300_df[-1:])
+        print(hushen_name,hushen300_df[-1:])
         print("hushen300_sum_rate",hushen300_sum_rate[-10:])
 
-        name, chuangye_df = eastStock.request_shangzheng_shenzheng('399006', ctype=0, klt="101", fqt="2",lmt='40')
+        chuangye_name, chuangye_df = eastStock.request_shangzheng_shenzheng(stock2[0], ctype=stock2[1], klt="101", fqt="2",lmt='40')
         chuangye_df.set_index('date',inplace=True)
         chuagnye_sum_rate = chuangye_df['涨跌幅度'].rolling(trading_days).sum()
-        print(name,chuangye_df[-1:])
+        print(chuangye_name,chuangye_df[-1:])
         print("chuagnye_sum_rate",chuagnye_sum_rate[-10:])
+        return (hushen_name + str(hushen300_sum_rate[-10:].round(4).to_dict()), chuangye_name + str(chuagnye_sum_rate[-10:].round(4).to_dict()))
 
     @classmethod
     def RotationStrategy(self):
@@ -278,7 +279,7 @@ class MyGrid:
         total_arr = [1]
         for rate in rotation_rate:
             total_money *= (1+rate/100.0)
-            total_arr.append(round(total_money, 3))
+            total_arr.append(round(total_money, 2))
         
         print("策略收益率:",total_money)
 
@@ -299,14 +300,14 @@ class MyGrid:
         chuangye_arr = []
         for rate in chuangye_df['涨跌幅度'][-test_count:]:
             chuangye_momoney *= (1+rate/100.0)
-            chuangye_arr.append(round(chuangye_momoney, 4))
+            chuangye_arr.append(round(chuangye_momoney, 2))
         print("长期持有创业板：",chuangye_momoney)
 
         hushen300_money = 1
         hushen300_arr = []
         for rate in hushen300_df['涨跌幅度'][-test_count:]:
             hushen300_money *= (1+rate/100.0)
-            hushen300_arr.append(round(hushen300_money, 3))
+            hushen300_arr.append(round(hushen300_money, 2))
         print("长期持有沪深300",hushen300_money)
 
         # return
@@ -342,8 +343,8 @@ class MyGrid:
         # 保存临时数据用于人工比对交易
         # hushen_df.to_csv("../{}_短期行情数据{}.csv".format(hushen_name,date_str))
         # chuangye_df.to_csv("../{}_短期行情数据{}.csv".format(chuangye_name,date_str))
-        
-        return self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen_df,gold_df=gold_df, test_count=test_days-20, sub_rate=sub_rate, long=1.5, short=.5, testRate=0.1) + (chuangye_name, hushen_name)
+
+        return self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen_df,gold_df=gold_df, test_count=test_days-20, sub_rate=sub_rate, long=1.5, short=0.5, testRate=0.1) + (chuangye_name, hushen_name)
         return
         my_params = []
         for sub_rate in range(-30,30):
@@ -365,58 +366,55 @@ class MyGrid:
         """
         趋势投资，根据前20个交易日的收益，决定是否继续持有或者空仓
         """
-        stock_df = pd.read_csv('unused/300059_东方财富后复权日K.csv', index_col=1)
-        # stock_df.set_index('date',inplace=True)
-        # 计算过去的20个交易日的 涨跌幅
-        trading_days = 20 # 周期
-        # 回测的交易天数
-        test_count = 1300
-        # ⚠️ 通过累加得到的数据有偏差，涨跌的基准数据会有变化
-        stock_sum_rate = stock_df['涨跌幅度'].rolling(trading_days).sum()
-        stock_sum_rate = stock_sum_rate.shift(1)
+        roll_date = 20
+        # stock = ('scm', 142)
+        stock = (399006,'0')
+        
+        name, df = eastStock.request_shangzheng_shenzheng(stock[0], ctype=stock[1], klt="101", fqt="2", lmt='2800')
+        df.set_index('date', inplace=True)
+        sum_rate = df['涨跌幅度'].rolling(roll_date).sum().shift(1)  # 避免未来函数，需要用到前一天的数据
 
-        # 计算金叉
-        averages_five = stock_df["涨跌幅度"].rolling(5).mean()
-        averages_ten = stock_df["涨跌幅度"].rolling(10).mean()
-        average_bigger = averages_five > averages_ten
-        average_bigger = average_bigger.shift(1)
+        print(df)
 
-        # 先拼接起，后面用于计算是否空仓
-        combo_df = pd.concat([stock_sum_rate, stock_df['涨跌幅度'], average_bigger], axis=1)
-        combo_df.columns = ["stock_sum_rate", "stock_day_rate", 'average_bigger']
-        # 修改涨跌幅，如果两个板块前20个交易日收益率为负数，后面就清仓，也就是收益率为0 ，这样可以控制回撤
-        
-        print("combo_df==",combo_df)
-        def getNew_stock_zdf(x):
-            """
-            如前20日创业板收益率大于0那么保留仓位，否则下一交易日就空仓
-            """
-            # return x["stock_day_rate"]
-            return x["stock_day_rate"] if x["stock_sum_rate"] > 2 and not x["average_bigger"] else 0
-        
-        stock_zdf = combo_df.apply(getNew_stock_zdf,axis=1)
-        stock_zdf = stock_zdf[-test_count:]
-        stock_zdf.dropna(inplace=True)
-        print("stock_zdf==",stock_zdf)
-        total_money = 1
-        total_arr = []
-        for rate in stock_zdf:
-            total_money *= (1+rate/100.0)
-            total_arr.append(round(total_money, 3))
-        
-        origin_money = 1
-        origin_arr = []
-        for rate in stock_df['涨跌幅度'][-test_count:]:
-            origin_money *= (1+rate/100.0)
-            origin_arr.append(origin_money)
-        
-        print("趋势收益",total_money)
-        print("长期持有收益",origin_money)
+        sum_name, day_name = name + "sum_rate", name + "day_rate"
+        combo_df = pd.concat([sum_rate, df['涨跌幅度']], axis=1)
+        combo_df.columns = [sum_name, day_name]
 
-        x_arr = stock_zdf.index.tolist()
-        y={"1.趋势": total_arr, "2.长期持有": origin_arr}
-        # 开始存入到文件，并绘制成折线图
-        return x_arr, y
+        print(sum_rate[-1])
+        print(combo_df)
+        # 当前持仓状态0表示空仓，1表示持有多头，-1表示持有空投
+        self.curren_status = 0
+        
+        self.trading_rate = 0
+        def caltest(x):
+            # 开始记统计交易盈亏，有误差不大
+            self.trading_rate += x[day_name]
+            if x[0] > 3:
+                if self.curren_status != 1:
+                    # 行情反转做多
+                    # 先记录上次做空交易记录
+                    x['short_rate'] = self.trading_rate
+                    self.curren_status = 1
+                    self.trading_rate = 0
+            elif self.curren_status != -1:
+                x['long_rate'] = self.trading_rate
+                self.curren_status = -1
+                self.trading_rate = 0
+            # return x
+            return x[1] * 1.5 if x[0] > 3  else -x[1]*.5
+        result = combo_df[21:].apply(caltest, axis=1)
+        print("result====",result)
+        # print('long_rate==',result['long_rate'].count())
+        # print('short_rate==',result['short_rate'].count())
+        # print(self.KellyCriterion(-result['short_rate']))
+        # print(self.KellyCriterion(result['long_rate']))
+        # result.to_csv('./test_kailifunc.csv')
+        # return
+        sum = 1
+        for obj in result:
+            sum *= (1 + obj/100.0)
+        print("sum=", sum)
+        print("持有不动=",df['close'][-1]/df['close'][21])
 
     @classmethod
     def MaxDrawdown(self,return_list):
@@ -515,10 +513,89 @@ class MyGrid:
         # print("history_df=\n",history_df)
         return history_df
 
+    @classmethod
+    def IndustryRotation(self):
+        # 行业轮动
+        # 用于筛选的行业指数
+        # indexs = ['SHSE.000910', 'SHSE.000909', 'SHSE.000911', 'SHSE.000912', 'SHSE.000913', 'SHSE.000914']
+        indexs = [('000910', 1), ('000909', 1), ('000911', 1), ('000912', 1), ('000913', 1), ('000914', 1)]
+        # indexs = [('000300', 1), ('399006', 0)]
+        # 用于统计数据的天数
+        roll_date = 20
+
+        first = True
+        for stock in indexs:
+            name, df = eastStock.request_shangzheng_shenzheng(stock[0], ctype=stock[1], klt="101", fqt="2", lmt='1500')
+            df.set_index('date', inplace=True)
+            sum_rate = df['涨跌幅度'].rolling(roll_date).sum().shift(1)  # 避免未来函数，需要用到前一天的数据
+
+            sum_name, day_name = name + "sum_rate", name + "day_rate"
+            if first:
+                combo_df = pd.concat([sum_rate, df['涨跌幅度']], axis=1)
+                combo_df.columns = [sum_name, day_name]
+                first = False
+            else:
+                combo_df[sum_name] = sum_rate
+                combo_df[day_name] = df['涨跌幅度']
+
+            print(sum_rate[-1])
+        print(combo_df)
+
+        def caltest(x):
+            series1 = x[[i % 2 == 0 for i in range(len(x.index))]]
+            series2 = x[[i % 2 == 1 for i in range(len(x.index))]]
+            return series2[series1.argmax()] * 1.5 if series1[series1.argmax()] > 3 and series1[series1.argmax()] < 30 else -series2[series1.argmin()]*0.5
+        result = combo_df[21:].apply(caltest, axis=1)
+        print(result)
+        sum = 1
+        for obj in result:
+            sum *= (1 + obj/100.0)
+        print("sum=", sum)
+
+        return
+        Series().cumprod()
+        Series().argmin
+
+    @classmethod
+    def KellyCriterion(self,ser):
+        '''
+        凯利公式
+        '''
+        # 计算正收益，就是胜率
+        s_bool = ser > 0
+        ser_count = ser.count()
+        success_count = s_bool.sum()
+        # 胜率p
+        p = success_count/ser_count
+        q = 1 - p
+        sum = 0
+        # Series().dropna
+        sum_success = 1
+        sum_failure = 1
+        for obj in ser.dropna():
+            if obj > 0:
+                sum_success *= (1+obj/100)
+            else:
+                sum_failure *= (1+obj/100)
+        success_rate = sum_success ** (1/success_count) - 1
+        failure_rate = 1 - sum_failure ** (1/(ser_count-success_count))
+        print("success_rate=",success_rate)
+        print("failure_rate=",failure_rate)
+        f = (p*success_rate - q*failure_rate)/(success_rate*failure_rate)
+        return f
+        # return sum/sum_bottom
 
 
-                
 
+# MyGrid.IndustryRotation()
+# MyGrid.TrendStrategy()
+
+# short
+# success_rate= 0.05094742882477399
+# failure_rate= 0.023801068299798667
+# 12.557205571131346
+# Length: 179, dtype: float64
+# sum= 1.1684828325316776
             
 # abc = [1,2,5,1,4,1,5,8,5,2,3,9,4,3,4]
 

@@ -10,6 +10,7 @@ String.prototype.myFormat = function () {
     // 实例化一个chart对象
     var myChart = echarts.init(document.querySelector('.row-header .chart'));
     // 2.指定配置项和数据
+    /** @type EChartsOption */
     var option = {
         toolbox: {
             show: true,
@@ -30,9 +31,9 @@ String.prototype.myFormat = function () {
             borderWidth: 1,
             borderColor: '#ccc',
             padding: 10,
-            textStyle: {
-                color: '#fff'
-            },
+            // textStyle: {
+            //     color: '#fff'
+            // },
             position: function (pos, params, el, elRect, size) {
                 const obj = {
                     top: 10
@@ -89,10 +90,12 @@ String.prototype.myFormat = function () {
         ],
         dataZoom: [
             {
+                filterMode: 'empty',
                 type: 'inside',
                 xAxisIndex: [0, 1],
                 start: 0,
-                end: 100
+                end: 100,
+                "filterMode": "filter"
             },
             {
                 show: true,
@@ -100,10 +103,36 @@ String.prototype.myFormat = function () {
                 type: 'slider',
                 top: '85%',
                 start: 0,
-                end: 100
+                end: 100,
+                height:20
             }
         ],
-        series: []
+        series: [],
+        visualMap: [
+            {
+                // 不显示图例
+                show: false,
+                seriesIndex: 3,
+                dimension: 1,
+                pieces: [
+                    { gte: 3, lte: 30, color: 'red' },
+                ],
+                outOfRange: {
+                    color: '#ee6666'
+                }
+            },
+            {
+                show: false,
+                seriesIndex: 4,
+                dimension: 1,
+                pieces: [
+                    { gte: 3, lte: 30, color: 'red' },
+                ],
+                outOfRange: {
+                    color: '#73c0de'
+                }
+            },
+        ]
     };
 
     function mySeries(name, data) {
@@ -130,11 +159,25 @@ String.prototype.myFormat = function () {
             //         false
             //     )
             // },
-            symbol: 'circle',
-            symbolSize: 5,
+            // symbol: 'circle',
+            symbolSize: 3,
             showSymbol: false,
             data: data,
-            type: 'line'
+            type: 'line',
+            markPoint: {
+                data: [
+                    {
+                        type: 'max',
+                        name: '最大值'
+                    },
+                    {
+                        type: 'min',
+                        name: '最小值'
+                    }
+                ]
+            },
+            zlevel: 0, z: 0, z2: 0,
+            
         }
     };
 
@@ -152,6 +195,22 @@ String.prototype.myFormat = function () {
             type: 'line',
             xAxisIndex: 1,
             yAxisIndex: 1,
+            zlevel: 1, z: 1, z2: 1,
+            markArea:{
+                // silent:true,
+                data: [
+                    [{
+                        name: '黄区',
+                        yAxis: 3,
+                        itemStyle: {
+                            color: '#eeff6688',
+                        }
+                    },
+                    {
+                        yAxis: 30
+                    }]
+                ]
+            }
         }
     };
 
@@ -222,6 +281,16 @@ String.prototype.myFormat = function () {
 (function () {
     var myChart = echarts.init(document.getElementById("year_rate"))
     var option = {
+        toolbox: {
+            show: true,
+            right: "5%",
+            feature: {
+                dataView: { show: true, readOnly: false },
+                magicType: { show: true, type: ['line', 'bar'] },
+                restore: { show: true },
+                saveAsImage: { show: true }
+            }
+        },
         title: {
             text: '年收益',
             subtext: 'Fake Data'
@@ -238,6 +307,7 @@ String.prototype.myFormat = function () {
         legend: {
             itemHeight: 10,
             itemWidth: 15,
+            itemGap:15,
             textStyle: {
                 fontSize: 10,
             }
@@ -267,7 +337,8 @@ String.prototype.myFormat = function () {
                 type: 'slider',
                 top: '88%',
                 start: 20,
-                end: 100
+                end: 100,
+                height:10
             }
         ],
         series: []
@@ -282,12 +353,15 @@ String.prototype.myFormat = function () {
                 "show": true,
                 "position": "top",
                 "margin": 8,
-                "formatter": "{c}%"
+                "formatter": "{c}%",
+                color:'auto'
             },
         }
     }
 
     var callBack = function (data) {
+        // should reset
+        option["series"] = []
         year_rate = data["year_rate"]
         option["xAxis"][0]["data"] = year_rate["x"]
         console.log(year_rate)
@@ -316,6 +390,7 @@ String.prototype.myFormat = function () {
             trigger: 'axis'
         },
         legend: {
+            show:false,
             itemHeight: 10,
             itemWidth: 15,
             textStyle: {
@@ -347,10 +422,26 @@ String.prototype.myFormat = function () {
                 "data": [],
                 "showBackground": false,
                 "barWidth": "50%",
+                itemStyle: {
+                    // 普通状态的颜色
+                    normal: {
+                        color: function (params) {
+                            var colorList = ["#5470c6","#91cc75","#fac858","#ee6666","#73c0de","#3ba272","#fc8452","#9a60b4","#ea7ccc"];
+                            return colorList[params.dataIndex];
+                        }
+                    },
+                    // 鼠标悬停的时候设置的颜色
+                    emphasis:{
+                        shadowBlur:10,
+                        shadowOffsetX:0,
+                        shadowColor:'rgba(0,0,0,0.5'
+                    }
+                },
                 "label": {
                     "show": true,
                     "position": "top",
-                    "margin": 8
+                    "margin": 8,
+                    color:'auto'
                 },
             }
         ]
@@ -359,6 +450,7 @@ String.prototype.myFormat = function () {
     var callBack = function (data) {
         year_rate = data["revenue_contribution"]
         option["xAxis"][0]["data"] = []
+        option["series"][0]["data"] = []
         for (var key in year_rate) {
             option["xAxis"][0]["data"].push(key)
             option["series"][0]["data"].push((year_rate[key] - 1).toFixed(2))
@@ -380,16 +472,17 @@ String.prototype.myFormat = function () {
     option = {
         title: {
             text: '交易频次',
-            subtext: 'Fake Data',
             left: 'center'
         },
         tooltip: {
+            show:false,
             trigger: 'item',
             formatter: "{a} <br/>{b} : {c} ({d}%)",
         },
         legend: {
             itemHeight: 10,
-            itemWidth: 15,
+            itemWidth: 10,
+            icon:'circle',
             textStyle: {
                 fontSize: 10,
             },
@@ -400,15 +493,21 @@ String.prototype.myFormat = function () {
             {
                 name: '交易频次',
                 type: 'pie',
-                radius: '50%',
-                data: [
-                    //   { value: 1048, name: 'Search Engine' },
-                    //   { value: 735, name: 'Direct' },
-                    //   { value: 580, name: 'Email' },
-                    //   { value: 484, name: 'Union Ads' },
-                    //   { value: 300, name: 'Video Ads' }
-                ],
+                radius: ['40%', '70%'],
+                // center: ["35%", "50%"],
+                avoidLabelOverlap: false,
+                data: [],
+                label: {
+                    show: false,
+                    position: 'center'
+                },
                 emphasis: {
+                    label: {
+                        show: true,
+                        fontSize: '100%',
+                        fontWeight: 'bold',
+                        formatter: "{b} \n 次数:{c}\n ({d}%)",
+                    },
                     itemStyle: {
                         shadowBlur: 10,
                         shadowOffsetX: 0,
@@ -419,6 +518,7 @@ String.prototype.myFormat = function () {
         ]
     };
     var callBack = function (data) {
+        option["series"][0]["data"] = []
         trading_count = data["trading_count"]
         for (var key in trading_count) {
             option["series"][0]["data"].push({ name: key, value: trading_count[key] })
@@ -435,17 +535,23 @@ String.prototype.myFormat = function () {
 })();
 
 // 立马请求数据
-(function () {
+function fetchData() {
+    // 不用缓存，直接使用最新的数据
+    // $.ajaxSetup({ cache: false });
     $.ajax({
         type: "get",
         // url:"http://localhost:8989/json/test.json",
         url: "json/test_mytest.json",
+        headers: {
+            'cache-control': 'no-cache',
+            'Pragma': 'no-cache'
+        },
         contentType: 'application/json;charset=utf-8',
         async: true,
         // data:JSON.stringify(eleMarkers),
         traditional: true,
         dataType: 'json',
-        timeout: 30000,
+        timeout: 300,
         success: function (data) {
             console.log(data)
             console.log(callBackFuncs.length)
@@ -455,4 +561,10 @@ String.prototype.myFormat = function () {
             }
         }
     })
-})();
+};
+fetchData();
+
+function completeAndReturnName() {
+    fetchData();
+    return "hello ,你收到数据了吗123";
+};
