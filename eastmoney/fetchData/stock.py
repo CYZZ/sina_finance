@@ -62,6 +62,38 @@ class eastStock():
         #   "2010-03-22,0.97,1.03,1.03,0.96,110104,693595698.00,7.61,11.96,0.11,39.32",]
 
     @classmethod
+    def request_day_trends(self, code: str, ctype=1, day=1):
+        """
+        获取分时行情数据
+        """
+        url = "http://push2.eastmoney.com/api/qt/stock/trends2/get"
+        params = {
+            "secid": '{type}.{code}'.format(type=ctype, code=code),
+            "ut": "fa5fd1943c7b386f172d6893dbfba10b",
+            "fields1": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13",
+            "fields2": "f51,f52,f53,f54,f55",
+            "iscr": 0,  # 是否获取集合竞价0是否
+            "cb": ""
+        }
+        head = {
+            "User-Agent": "Mozilla/5.0(Macintosh; Intel Mac OSX 10_15_7) AppleWebKit/537.36(KHTML, like Gecko) Chrome / 96.0.4664.110 Safari / 537.36 Edg / 96.0.1054.62"
+        }
+        response = requests.get(url=url, params=params, headers=head).json()
+        print('{type}.{code}'.format(type=ctype, code=code))
+        print("responseTYpe=", type(response))
+        name = response["data"]["name"]
+        klines = response["data"]["trends"]
+        fields = ['date', 'open', 'close', 'high', 'low']
+        result = list(map(lambda kline: kline.split(','), klines))
+        print(result[0])
+        df = DataFrame(result, columns=fields)
+        df = df.apply(lambda col: pd.to_numeric(col, errors='ignore'))
+        # 昨收价
+        prePrice = response["data"]["prePrice"]
+        print(df)
+        return name, df, prePrice
+
+    @classmethod
     def test_save_local(self):
         code = "510300"
         # code = "300015"

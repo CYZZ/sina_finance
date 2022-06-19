@@ -153,7 +153,7 @@ class MyGrid:
         plt.show()
 
     @classmethod
-    def XBXRotationStrategy(self, hushen300_df: DataFrame, chuangye_df: DataFrame, gold_df: DataFrame, test_count=100, trading_days=20, sub_rate=3.0, testRate=0.2, **kwargs):
+    def XBXRotationStrategy(self, hushen300_df: DataFrame, chuangye_df: DataFrame, test_count=100, trading_days=20, sub_rate=3.0, testRate=0.2, **kwargs):
         '''
         邢不行的轮动策略：
         在两个品种之间轮动，通过比较过去的N个交易日的涨跌幅，如果大盘涨幅大于小盘则下日持有大盘，否则持有小盘；
@@ -205,8 +205,8 @@ class MyGrid:
         print("做多杠杆率={},做空杠杆率={}".format(long_leverage, short_leverage))
         
         # 先拼接起，后面用于计算是否空仓
-        combo_df = pd.concat([pre_isBigger, chuangye_sum_rate, hushen300_sum_rate, chuangye_df['涨跌幅度'], hushen300_df['涨跌幅度'],gold_df['涨跌幅度']], axis=1)
-        combo_df.columns = ["pre_isBigger", "chuangye_sum_rate", "hushen300_sum_rate", "chuangye_day_rate", "hushen300_day_rate","gold_day_rate"]
+        combo_df = pd.concat([pre_isBigger, chuangye_sum_rate, hushen300_sum_rate, chuangye_df['涨跌幅度'], hushen300_df['涨跌幅度']], axis=1)
+        combo_df.columns = ["pre_isBigger", "chuangye_sum_rate", "hushen300_sum_rate", "chuangye_day_rate", "hushen300_day_rate"]
         combo_df.sort_index(axis=0,inplace=True)
         combo_df = combo_df[-test_count:]
         
@@ -335,16 +335,14 @@ class MyGrid:
     def XBXTestServiceData(self, sub_rate=3.0, stocks=( (159949, "0"),(510300, "1")), test_days=1300):
         hushen_name, hushen_df = eastStock.request_shangzheng_shenzheng(stocks[0][0], ctype=stocks[0][1], klt="101", fqt=2, lmt=test_days)
         chuangye_name, chuangye_df = eastStock.request_shangzheng_shenzheng(stocks[1][0], ctype=stocks[1][1], klt="101", fqt=2, lmt=test_days)
-        gold_name, gold_df = eastStock.request_shangzheng_shenzheng(518880, ctype=1, klt="101", fqt=2, lmt=test_days)
         hushen_df.set_index('date', inplace=True)
         chuangye_df.set_index('date', inplace=True)
-        gold_df.set_index('date', inplace=True)
 
         # 保存临时数据用于人工比对交易
         # hushen_df.to_csv("../{}_短期行情数据{}.csv".format(hushen_name,date_str))
         # chuangye_df.to_csv("../{}_短期行情数据{}.csv".format(chuangye_name,date_str))
 
-        return self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen_df,gold_df=gold_df, test_count=test_days-20, sub_rate=sub_rate, long=1.5, short=0.5, testRate=0.1) + (chuangye_name, hushen_name)
+        return self.XBXRotationStrategy(chuangye_df=chuangye_df, hushen300_df=hushen_df, test_count=test_days-20, sub_rate=sub_rate, long=1.5, short=0.5, testRate=0.1) + (chuangye_name, hushen_name)
         return
         my_params = []
         for sub_rate in range(-30,30):

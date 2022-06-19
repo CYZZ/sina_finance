@@ -12,6 +12,7 @@ from pyecharts.charts import Line,Bar,Grid, Pie,Line3D
 import datetime,time
 import sys
 import os
+from GUI.day_chart import MyDayChart
 
 
 from pathlib import Path
@@ -319,6 +320,9 @@ class MyWindowFour(QWidget):
 
         self.setLayout(self.layout)
         self.layout.setCurrentIndex(1)
+    def __del__(self):
+        print("已经销毁了当前的窗口four",self)
+
 class MyWindowFive(QWidget):
     # 分割器
     def __init__(self,parent=None):
@@ -392,6 +396,8 @@ class MyWindowFive(QWidget):
         
         logout_button = QPushButton("登出")
         logout_button.clicked.connect(self.logout_click)
+        test_button = QPushButton("弹出新窗口")
+        test_button.clicked.connect(self.push_newWindow)
         
         form_layout = QFormLayout()
         # 设置子控件的自动拉伸到flow的最大宽度
@@ -407,6 +413,7 @@ class MyWindowFive(QWidget):
         vLayout.addWidget(change_button)
         vLayout.addLayout(form_layout)
         vLayout.addWidget(logout_button)
+        vLayout.addWidget(test_button)
 
         vLayout.addStretch()
         widge = QWidget()
@@ -425,8 +432,12 @@ class MyWindowFive(QWidget):
 
     def login(self):
         # 在子线程刷新数据，回到主线程刷新UI
-        self.thread = myQThread(self.target_func,"test11")
-        self.thread.mySignal.connect(self.mytestLogin)
+        if type(self.thread) == myQThread:
+            print("11-已经初始化thead")
+        else:
+            print("22-开始初始化thread")
+            self.thread = myQThread(self.target_func,"test11")
+            self.thread.mySignal.connect(self.mytestLogin)
         self.thread.start()
     
     def register(self):
@@ -457,6 +468,12 @@ class MyWindowFive(QWidget):
         self.textEdit.setText(result[0] + '\n\n' + result[1])
         print(result)
 
+    def push_newWindow(self):
+        print("开始弹窗新的窗口")
+        self.new_window = MyDayChart()
+        self.new_window.setWindowTitle("新窗口")
+        self.new_window.resize(1200,1400)
+        self.new_window.show()
 
     def target_func(self,param):
         print("开始要执行耗时操作了！！！！！")
@@ -546,11 +563,13 @@ class myQThread(QThread):
         self.param = param
     
     def __del__(self):
-        self.wait()
+        print("has __del__ thread")
+        # self.wait()
+        # self.exit()
     a = 1
     def run(self):
-        myQThread.a += 1
-        print("开始运行线程----",myQThread.a)
+        self.a += 1
+        print("开始运行线程----",self.a)
         self.func(self.param)
         print("执行完了目标函数————")
         self.mySignal.emit()
