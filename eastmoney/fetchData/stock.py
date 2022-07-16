@@ -1,4 +1,5 @@
 # 东方财富获取股票数据
+from typing import Iterable
 import pandas as pd
 import numpy as np
 from pandas import *
@@ -92,6 +93,25 @@ class eastStock():
         prePrice = response["data"]["prePrice"]
         print(df)
         return name, df, prePrice
+
+    @classmethod
+    def request_ulist_stocks(self, secids: Iterable[str]):
+        """
+        获取多个股票的收盘价
+        secids: 股票代码, ctye.code例如([0.002466])
+
+        """
+        url = "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2"
+
+        params = {
+            "secids": ",".join(secids),
+            "fields": "f3,f12,f14,f1,f2,f4",
+            "fltt": 2,
+            "invt": 2,
+            "_": "1657945282430"
+        }
+        response = requests.get(url,  params=params).json()
+        return [obj["f2"] for obj in response["data"]["diff"]]
 
     @classmethod
     def test_save_local(self):
