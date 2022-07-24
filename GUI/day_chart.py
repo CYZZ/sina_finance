@@ -57,12 +57,17 @@ class MyDayChart(QWidget):
 
         update_button = QPushButton("保存数据")
         update_button.clicked.connect(self.update_date)
+
+        self.stock_edit = QLineEdit()
+        self.stock_edit.setPlaceholderText("请输入关键字搜索")
+        self.stock_edit.returnPressed.connect(self.startSearch)
         
         vLayout.addWidget(login_button)
         # vLayout.addLayout(form_layout)
         # vLayout.addWidget(listView)
         vLayout.addWidget(listWidge)
         vLayout.addWidget(update_button)
+        vLayout.addWidget(self.stock_edit)
 
         vLayout.addStretch()
         widge = QWidget()
@@ -138,6 +143,11 @@ class MyDayChart(QWidget):
     def update_date(self):
         items = [self.listWidge.item(idx).text() for idx in range(self.listWidge.count())]
         update_history_data(items)
+
+    def startSearch(self):
+        text = self.stock_edit.text()
+        result =eastStock.get_stock_info(text)
+        self.textEdit.setText(str(result))
 
 
 class MyListwidge(QListWidget):

@@ -1,5 +1,6 @@
 # 基金相关
 from typing import List
+from wsgiref import headers
 import requests
 import re
 import json
@@ -8,7 +9,7 @@ from bs4 import BeautifulSoup
 from pandas import *
 import pandas as pd
 import numpy as np
-import jqdatasdk as jq
+# import jqdatasdk as jq
 from datetime import date
 import matplotlib.pyplot as plt
 import math
@@ -18,7 +19,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASE_DIR))
-from plot_test.jukuang_test import auth_jukuang
+
+from eastmoney.fetchData.stock import eastStock
+# from plot_test.jukuang_test import auth_jukuang
 
 
 class EastFunds():
@@ -94,6 +97,7 @@ class EastFunds():
         print(myDF)
         # print(myDF.info)
         myDF.to_csv(str(code) + '_基金历史十大持仓.csv')
+        return myDF
 
     @classmethod
     def read_funds_from(self, file: str) -> DataFrame:
@@ -107,31 +111,6 @@ class EastFunds():
         return df
 
     @classmethod
-    def load_data_from_jukuang_service(self, codes, end_date: str, count=1):
-        """
-        从聚宽平台获取数据
-        :return:
-        """
-        # auth_jukuang()
-        print("codes=", codes)
-        # 转换代码格式
-        nm_code = jq.normalize_code(codes)
-
-        # 输入
-        # jq.normalize_code(['000001', 'SZ000001', '000001SZ', '000001.sz', '000001.XSHE'])
-        # ['000001.XSHE', '000001.XSHE', '000001.XSHE', '000001.XSHE', '000001.XSHE']
-        # 获取股票的数据
-        # fields = ['open', 'close', 'low', 'high', 'volume', 'money',
-        #           'factor', 'high_limit', 'low_limit', 'avg', 'pre_close', 'paused']
-        fields = None
-        # 获取当前的行情数据
-        df_stock: DataFrame = jq.get_price(nm_code, count=count, end_date=end_date, fields=fields, panel=False)
-        print("----开始查看持仓股票的信息----")
-        df_stock.set_index(['code'], inplace=True)
-        print(df_stock)
-        return nm_code, df_stock
-    
-    @classmethod
     def calculate_fund_earnings_rate(self, fileName: str):
         """
         计算拟合收益率,
@@ -143,7 +122,7 @@ class EastFunds():
         # 获取时间序列
         end_date = list(set(end_date))  # 不能保证原有的顺序
         end_date.sort()
-        print(end_date)
+        print("end_date=",end_date)
 
         # test 获取股票代码
         first_end_date = end_date[0]
@@ -202,6 +181,114 @@ class EastFunds():
 
         return sum(result)
 
+    @classmethod
+    def get_public_dates(self, fund_code: str) -> List[str]:
+        """
+        获取历史上更新持仓情况的日期列表
+        -
+        Parameters
+        ---
+        fund_code : 
+            str 6 位基金代码
+        ---
+        Returns
+        ---
+        List[str]
+            指定基金公开持仓的日期列表
+        """
+
+        params = (
+            ('FCODE', fund_code),
+            # ('OSVersion', '14.3'),
+            # ('appVersion', '6.3.8'),
+            ('deviceid', '3EA024C2-7F22-408B-95E4-383D38160FB3'),
+            ('plat', 'Iphone'),
+            # ('plat','Android'),
+            ('product', 'EFund'),
+            # ('serverVersion', '6.3.6'),
+            ('version', '6.3.8'),
+        )
+        url = 'https://fundmobapi.eastmoney.com/FundMNewApi/FundMNIVInfoMultiple'
+        headers = {
+            'User-Agent': 'EMProjJijin/6.2.8 (iPhone; iOS 13.6; Scale/2.00)',
+            # 'GTOKEN': '98B423068C1F4DEF9842F82ADF08C5db',
+            # 'clientInfo': 'ttjj-iPhone10,1-iOS-iOS13.6',
+            # 'Content-Type': 'application/x-www-form-urlencoded',
+            # 'Host': 'fundmobapi.eastmoney.com',
+            # 'Referer': 'https://mpservice.com/516939c37bdb4ba2b1138c50cf69a2e1/release/pages/FundHistoryNetWorth',
+        }
+        # headers = {}
+        json_response = requests.get(
+            url,
+            headers=headers,
+            params=params).json()
+        if json_response['Datas'] is None:
+            return []
+        return json_response['Datas']
+
+    @classmethod
+    def get_inverst_postion(self, code: str, date=None) -> pd.DataFrame:
+        '''
+        根据基金代码跟日期获取基金持仓信息
+        ---
+        参数
+        ---
+            code 基金代码 \n
+            date 公布日期 形如 '2020-09-31' 默认为 None，得到最新公布的数据
+        返回
+        ---
+            持仓信息表格
+        '''
+        EastmoneyFundHeaders = {
+            'User-Agent': 'EMProjJijin/6.2.8 (iPhone; iOS 13.6; Scale/2.00)',
+            # 'GTOKEN': '98B423068C1F4DEF9842F82ADF08C5db',
+            # 'clientInfo': 'ttjj-iPhone10,1-iOS-iOS13.6',
+            # 'Content-Type': 'application/x-www-form-urlencoded',
+            # 'Host': 'fundmobapi.eastmoney.com',
+            # 'Referer': 'https://mpservice.com/516939c37bdb4ba2b1138c50cf69a2e1/release/pages/FundHistoryNetWorth',
+        }
+        params = [
+            ('FCODE', code),
+            ('MobileKey', '3EA024C2-7F22-408B-95E4-383D38160FB3'),
+            ('OSVersion', '14.3'),
+            ('appType', 'ttjj'),
+            ('appVersion', '6.2.8'),
+            ('deviceid', '3EA024C2-7F22-408B-95E4-383D38160FB3'),
+            ('plat', 'Iphone'),
+            ('product', 'EFund'),
+            ('serverVersion', '6.2.8'),
+            ('version', '6.2.8'),
+        ]
+        if date is not None:
+            params.append(('DATE', date))
+        params = tuple(params)
+
+        response = requests.get('https://fundmobapi.eastmoney.com/FundMNewApi/FundMNInverstPosition',
+                                headers=EastmoneyFundHeaders, params=params)
+        rows = []
+        stocks = response.json()['Datas']['fundStocks']
+
+        columns = {
+            'GPDM': '股票代码',
+            'GPJC': '股票简称',
+            'JZBL': '持仓占比(%)',
+            'PCTNVCHG': '较上期变化(%)',
+        }
+        if stocks is None:
+            return pd.DataFrame(rows, columns=columns.values())
+
+        df = pd.DataFrame(stocks)
+        print(df)
+        df = df[list(columns.keys())].rename(columns=columns)
+        return df
+
+
+code = '161725'
+date  = '2022-03-31'
+df = EastFunds.get_inverst_postion(code, date=date)
+print(df)
+# public_dates = EastFunds.get_public_dates(code)
+# print(public_dates)
 # 通过读取csv文件获取持仓数据并
 # 通过聚宽平台获取每个股票的收盘价
 # auth_jukuang()

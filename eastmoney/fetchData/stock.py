@@ -101,7 +101,7 @@ class eastStock():
         secids: 股票代码, ctye.code例如([0.002466])
 
         """
-        url = "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2"
+        url = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 
         params = {
             "secids": ",".join(secids),
@@ -112,6 +112,23 @@ class eastStock():
         }
         response = requests.get(url,  params=params).json()
         return [obj["f2"] for obj in response["data"]["diff"]]
+
+    @classmethod
+    def get_stock_info(self, input: str):
+        """
+        根据关键字获取股票信息
+
+        """
+        url = "https://searchapi.eastmoney.com/api/suggest/get"
+        params = {
+            "input": input,
+            "type": 14,
+            "count": 1,
+            "token": "D43BF722C8E33BDC906FB84D85E326E8",
+        }
+        response = requests.get(url,  params=params).json()
+        return response
+
 
     @classmethod
     def test_save_local(self):
@@ -127,3 +144,7 @@ class eastStock():
         print(name)
         print(df[-1:])
         # python3 eastmoney/fetchData/stock.py 
+
+# abc = eastStock.get_stock_info("东方财富")
+# print(abc)
+# print(abc["QuotationCodeTable"])
